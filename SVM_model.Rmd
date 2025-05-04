@@ -1,0 +1,97 @@
+---
+title: "SVM_model"
+author: "Ian Stewart"
+date: "2025-05-01"
+output: pdf_document
+---
+
+Steps of building model:
+
+- train the model and tune
+
+- test model based on tuned parameters
+
+- calculate error and accuracy
+
+```{r, include=FALSE}
+library(e1071)
+library(tidyverse)
+```
+
+#Load in your own paths
+```{r}
+train <- read.csv("C:\\Users\\galac\\Downloads\\train_fires10.csv")
+
+test <- read.csv("C:\\Users\\galac\\Downloads\\test_fires10.csv")
+```
+
+
+#################################################################################################################
+
+#If already Imputed don't run!!
+```{r}
+train <- train %>%
+  mutate(across(where(is.character), as.factor),
+         owner_code = as.factor(owner_code),
+         discovery_hour = as.factor(discovery_hour),
+         burn_time_seconds = log(1+burn_time_seconds),
+         fire_size = log(fire_size))
+
+
+test <- test %>%
+  mutate(across(where(is.character), as.factor),
+         owner_code = as.factor(owner_code),
+         discovery_hour = as.factor(discovery_hour),
+         burn_time_seconds = log(1+burn_time_seconds),
+         fire_size = log(fire_size))
+
+
+train <- train %>%
+  mutate(burn_time_seconds = ifelse(burn_time_seconds == 0, NA, burn_time_seconds)) %>%
+  group_by(fire_size_class) %>%
+  mutate(burn_time_seconds = ifelse(is.na(burn_time_seconds), median(burn_time_seconds, na.rm = TRUE), burn_time_seconds)) %>%
+  ungroup() %>% 
+  select(-fire_size_class)
+
+test <- test %>%
+  mutate(burn_time_seconds = ifelse(burn_time_seconds == 0, NA, burn_time_seconds)) %>%
+  group_by(fire_size_class) %>%
+  mutate(burn_time_seconds = ifelse(is.na(burn_time_seconds), median(burn_time_seconds, na.rm = TRUE), burn_time_seconds)) %>%
+  ungroup() %>% 
+  select(-fire_size_class)
+
+glimpse(train)
+```
+####################################################################################################################
+
+#For this code under use the variables that have been transformed and are deemed important, NOTE: get rid of the train[1:1000, ] in the models so you can train and test on the wholeeeeee data
+
+```{r}
+set.seed(123)
+```
+
+```{r}
+
+tune.out <- tune(svm, stat_cause_descr ~ ., data = train[1:1000,],
+kernel = "radial",
+ranges = list(
+cost = c(0.1, 1, 10, 100, 1000),
+gamma = c(0.5, 1, 2, 3, 4)
+)
+)
+
+summary(tune.out)
+```
+
+#Used cost = 1 and gamma = 0.5 based on the step above but use whatever it outputs for the whole data
+
+```{r}
+svm_mod_best <- svm(stat_cause_descr ~ ., data = train[1:1000,], kernel = "radial",
+cost = 1, gamma = 0.5)
+
+pred <- predict(svm_mod_best, newdata = test[1:1000,])
+table(pred, test[1:1000,]$stat_cause_descr)
+
+mean(pred == test[1:1000,]$stat_cause_descr)
+```
+
