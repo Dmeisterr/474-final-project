@@ -1,0 +1,85 @@
+---
+title: "Seth Analysis"
+author: "Seth Jernigan"
+date: "2025-05-04"
+output: pdf_document
+---
+
+```{r}
+raw_data <- read.csv("data/feature_selection_sample_10_percent.csv")
+```
+
+```{r}
+library(RSQLite)
+library(dbplyr)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(xts)
+library(ggfortify)
+library(ggthemes)
+library(maps)
+library(mapdata)
+library(leaflet)
+```
+
+```{r}
+conn <- dbConnect(SQLite(), "data/wildfires.sqlite")
+
+fires <- tbl(conn, "Fires") %>% collect()
+
+dbDisconnect(conn)
+```
+```{r}
+firesCrop <- fires %>%
+  select(
+    FIRE_YEAR,
+    DISCOVERY_DATE,
+    DISCOVERY_DOY,
+    DISCOVERY_TIME,
+    STAT_CAUSE_DESCR,
+    CONT_DATE,
+    CONT_DOY,
+    CONT_TIME,
+    FIRE_SIZE,
+    FIRE_SIZE_CLASS,
+    LATITUDE,
+    LONGITUDE,
+    OWNER_CODE,
+    OWNER_DESCR,
+    STATE
+  ) %>% 
+  rename_with(tolower) %>% 
+  
+```
+
+
+```{r}
+remNa <- firesCrop %>% 
+  na.omit()
+```
+
+```{r}
+trainInd <- sample(seq(1, nrow(remNa)), 0.7 * nrow(remNa), replace = FALSE)
+
+train_fires <- remNa[trainInd, ]
+test_fires <- remNa[-trainInd, ]
+```
+
+
+
+
+
+```{r}
+table(remNa$state)
+```
+
+```{r}
+table(remNa$stat_cause_descr)
+```
+
+
+```{r}
+trainInd <- sample(seq(1, nrow(raw_data)), nrow(raw_data) * 0.7, replace = FALSE)
+```
+

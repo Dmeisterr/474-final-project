@@ -1,0 +1,153 @@
+---
+title: "Seth EDA Gradient Boosting"
+author: "Seth Jernigan"
+date: "2025-05-04"
+output: pdf_document
+---
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(rlang)
+library(patchwork)
+```
+
+```{r}
+trainData <- read.csv("data/train_fires10.csv")
+testData <- read.csv("data/test_fires10.csv")
+```
+
+```{r}
+glimpse(trainData)
+```
+
+```{r}
+trainData$stat_cause_descr <- as.factor(trainData$stat_cause_descr)
+trainData$fire_size_class <- as.factor(trainData$fire_size_class)
+trainData$owner_code <- as.factor(trainData$owner_code)
+trainData$state <- as.factor(trainData$state)
+trainData$discovery_hour <- as.factor(trainData$discovery_hour)
+trainData$discovery_month <- factor(trainData$discovery_month, levels = month.abb)
+
+testData$stat_cause_descr <- as.factor(testData$stat_cause_descr)
+testData$fire_size_class <- as.factor(testData$fire_size_class)
+testData$owner_code <- as.factor(testData$owner_code)
+testData$state <- as.factor(testData$state)
+testData$discovery_hour <- as.factor(testData$discovery_hour)
+testData$discovery_month <- factor(testData$discovery_month, levels = month.abb)
+```
+
+
+### Exploratory Data Analysis
+
+Feature Distributions
+
+```{r}
+freqVars <- c("fire_year", "stat_cause_descr", "fire_size_class",
+              "owner_code","discovery_hour", "discovery_month")
+
+plotFreqs <- function(data, varName) {
+  var_sym <- sym(varName)
+  
+  ang <- ifelse(varName == "stat_cause_descr", 90, 0)
+  
+  ggplot(data, aes(x = !!var_sym)) +
+    geom_bar(fill = "steelblue", color = "black") +
+    labs(
+      title = paste("Fires by", gsub("_", " ", tools::toTitleCase(varName))),
+      x = tools::toTitleCase(gsub("_", " ", varName)),
+      y = "Count"
+    ) +
+    theme_minimal()+
+    theme(axis.text.x = element_text(angle = ang, vjust = 0.5, hjust = 1))
+}
+
+lapply(freqVars, function(var) plotFreqs(trainData, var))
+```
+
+Fire Size
+```{r}
+ggplot(trainData, aes(x = log_fire_size)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "black")+
+  labs(title = "Fire Size Distribution (Log Scale)", x = "Log(Fire Size)", y = "Frequency") +
+  theme_minimal()
+```
+
+Burn Time
+```{r}
+ggplot(trainData, aes(x = log_burn_time + 1)) +
+  geom_histogram(fill = "steelblue", color = "black", bins = 50) +
+  labs(
+    title = "Distribution of Burn Time (Log Scale)",
+    x = "Log(Burn Time in Seconds)",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+noBurnTime <- trainData[which(trainData$burn_time_seconds == 0), ]
+
+unique(noBurnTime$stat_cause_descr)
+```
+
+```{r}
+table(noBurnTime$stat_cause_descr)
+```
+
+
+
+[Plus Dan's US Plot]
+
+### Gradient Boosted Tree
+```{r}
+trainData <- read.csv("data/train_fires10.csv")
+testData <- read.csv("data/test_fires10.csv")
+```
+
+```{r}
+trainData$stat_cause_descr <- as.factor(trainData$stat_cause_descr)
+trainData$fire_size_class <- as.factor(trainData$fire_size_class)
+trainData$owner_code <- as.factor(trainData$owner_code)
+trainData$state <- as.factor(trainData$state)
+trainData$discovery_hour <- as.factor(trainData$discovery_hour)
+trainData$discovery_month <- factor(trainData$discovery_month, levels = month.abb)
+
+testData$stat_cause_descr <- as.factor(testData$stat_cause_descr)
+testData$fire_size_class <- as.factor(testData$fire_size_class)
+testData$owner_code <- as.factor(testData$owner_code)
+testData$state <- as.factor(testData$state)
+testData$discovery_hour <- as.factor(testData$discovery_hour)
+testData$discovery_month <- factor(testData$discovery_month, levels = month.abb)
+```
+
+```{r}
+library(gbm)
+library(caret)
+set.seed(1)
+
+ctrl <- trainControl(method = "cv", number = 5)
+
+trainDataVarSelect <- trainData %>% select(-fire_size_class)
+testDataVarSelect <- testData %>% select(-fire_size_class)
+
+
+gbm_grid <- expand.grid(
+  n.trees = c(500, 1000, 2000),
+  interaction.depth = c(2, 3),
+  shrinkage = 0.1,
+  n.minobsinnode = 10
+)
+
+boostCvMod <- train(
+  stat_cause_descr ~ .,
+  data = trainDataVarSelect,
+  method = "gbm",
+  trControl = ctrl,
+  verbose = FALSE,
+  verbose = FALSE,
+  tuneGrid = gbm_grid
+)
+```
+
+
+
